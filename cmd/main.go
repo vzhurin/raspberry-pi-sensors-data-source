@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"periph.io/x/conn/v3/i2c"
 	"periph.io/x/conn/v3/i2c/i2creg"
 	"periph.io/x/conn/v3/physic"
 	"periph.io/x/devices/v3/bmxx80"
@@ -18,70 +18,40 @@ import (
 const i2cBus = "1"
 const bme280I2CAddress = 0x76
 const metricsPort = 9101
+const metricsPrefix = "sensors-1"
 
 func main() {
-	err := initHost()
-	if err != nil {
+	if _, err := host.Init(); err != nil {
 		log.Fatal(err)
 	}
 
-	bus, err := newBus(i2cBus)
+	bus, err := i2creg.Open(i2cBus)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bus.Close()
+	defer func() {
+		err := bus.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
-	device, err := newDevice(bus, bme280I2CAddress)
+	device, err := bmxx80.NewI2C(bus, bme280I2CAddress, &bmxx80.DefaultOpts)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer device.Halt()
+	defer func() {
+		err := device.Halt()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
-	collector := newPrometheusCollector(device)
+	collector := newPrometheusCollector(device, metricsPrefix)
 	prometheus.MustRegister(collector)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(metricsPort), nil))
-}
-
-func initHost() error {
-	// Load all the drivers:
-	if _, err := host.Init(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func newBus(i2cBus string) (i2c.BusCloser, error) {
-	// Open a handle to the first available I²C bus:
-	bus, err := i2creg.Open(i2cBus)
-	if err != nil {
-		return nil, err
-	}
-
-	return bus, err
-}
-
-func newDevice(bus i2c.Bus, address uint16) (*bmxx80.Dev, error) {
-	// Open a handle to a bme280/bmp280 connected on the²C bus using default
-	// settings:
-	device, err := bmxx80.NewI2C(bus, address, &bmxx80.DefaultOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	return device, err
-}
-
-func newEnv(device *bmxx80.Dev) (*physic.Env, error) {
-	// Read temperature from the sensor:
-	var env physic.Env
-	if err := device.Sense(&env); err != nil {
-		return nil, err
-	}
-
-	return &env, nil
 }
 
 type prometheusCollector struct {
@@ -92,11 +62,11 @@ type prometheusCollector struct {
 	device *bmxx80.Dev
 }
 
-func newPrometheusCollector(device *bmxx80.Dev) *prometheusCollector {
+func newPrometheusCollector(device *bmxx80.Dev, metricsPrefix string) *prometheusCollector {
 	return &prometheusCollector{
-		temperatureMetric: prometheus.NewDesc("Temperature", "Shows temperature", nil, nil),
-		pressureMetric:    prometheus.NewDesc("Pressure", "Shows pressure", nil, nil),
-		humidityMetric:    prometheus.NewDesc("Humidity", "Shows humidity", nil, nil),
+		temperatureMetric: prometheus.NewDesc(fmt.Sprintf("%s-temperature", metricsPrefix), "Shows temperature", nil, nil),
+		pressureMetric:    prometheus.NewDesc(fmt.Sprintf("%s-pressure", metricsPrefix), "Shows pressure", nil, nil),
+		humidityMetric:    prometheus.NewDesc(fmt.Sprintf("%s-humidity", metricsPrefix), "Shows humidity", nil, nil),
 
 		device: device,
 	}
@@ -111,7 +81,7 @@ func (c *prometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *prometheusCollector) Collect(ch chan<- prometheus.Metric) {
 	var env physic.Env
 	if err := c.device.Sense(&env); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	temperature := prometheus.MustNewConstMetric(c.temperatureMetric, prometheus.GaugeValue, float64(env.Temperature))
