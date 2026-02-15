@@ -16,7 +16,7 @@ import (
 )
 
 const i2cBus = "1"
-const bme280I2CAddress = 0x77
+const bme280I2CAddress = 0x76
 const metricsPort = 9101
 
 func main() {

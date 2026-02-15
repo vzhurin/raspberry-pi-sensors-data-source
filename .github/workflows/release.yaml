@@ -1,6 +1,6 @@
 on:
   release:
-    types: [created]
+    types: [ created ]
 
 permissions:
   contents: write
@@ -13,9 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: wangyoucao577/go-release-action@v1
+        env:
+          CGO_ENABLED: 0
         with:
           project_path: "./cmd"
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: linux
           goarch: arm64
+          goversion: 1.23.6
           compress_assets: 'OFF'
