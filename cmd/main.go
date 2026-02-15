@@ -18,7 +18,7 @@ import (
 const i2cBus = "1"
 const bme280I2CAddress = 0x76
 const metricsPort = 9101
-const metricsPrefix = "sensors-1"
+const metricsPrefix = "sensors_1"
 
 func main() {
 	if _, err := host.Init(); err != nil {
@@ -64,9 +64,9 @@ type prometheusCollector struct {
 
 func newPrometheusCollector(device *bmxx80.Dev, metricsPrefix string) *prometheusCollector {
 	return &prometheusCollector{
-		temperatureMetric: prometheus.NewDesc(fmt.Sprintf("%s-temperature", metricsPrefix), "Shows temperature", nil, nil),
-		pressureMetric:    prometheus.NewDesc(fmt.Sprintf("%s-pressure", metricsPrefix), "Shows pressure", nil, nil),
-		humidityMetric:    prometheus.NewDesc(fmt.Sprintf("%s-humidity", metricsPrefix), "Shows humidity", nil, nil),
+		temperatureMetric: prometheus.NewDesc(fmt.Sprintf("%s_temperature", metricsPrefix), "Shows temperature", nil, nil),
+		pressureMetric:    prometheus.NewDesc(fmt.Sprintf("%s_pressure", metricsPrefix), "Shows pressure", nil, nil),
+		humidityMetric:    prometheus.NewDesc(fmt.Sprintf("%s_humidity", metricsPrefix), "Shows humidity", nil, nil),
 
 		device: device,
 	}
